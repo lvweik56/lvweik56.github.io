@@ -1,0 +1,1129 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RPA 流程图编辑器</title>
+    <style>
+        :root {
+            --sidebar-bg: #1a1d27;
+            --sidebar-hover: #252836;
+            --canvas-bg: #f0f2f7;
+            --module-bg: #ffffff;
+            --module-shadow: 0 4px 20px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.05);
+            --module-shadow-hover: 0 8px 32px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.08);
+            --text-primary: #1e2233;
+            --text-secondary: #5a6072;
+            --accent-blue: #4f6ef7;
+            --accent-green: #22c55e;
+            --accent-orange: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --port-input: #4f6ef7;
+            --port-output: #22c55e;
+            --port-if: #3b82f6;
+            --port-else: #f59e0b;
+            --border-light: #e5e7eb;
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --font-sans: 'Inter', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: #0d0f16;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            user-select: none;
+            -webkit-user-select: none;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ============ 整体布局 ============ */
+        .app-container {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* ============ 左侧面板 ============ */
+        .sidebar {
+            width: 260px;
+            min-width: 260px;
+            background: var(--sidebar-bg);
+            display: flex;
+            flex-direction: column;
+            z-index: 10;
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 4px 0 30px rgba(0, 0, 0, 0.4);
+            position: relative;
+        }
+
+        .sidebar::after {
+            content: '';
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background: linear-gradient(180deg,
+                    rgba(255, 255, 255, 0.08) 0%,
+                    rgba(255, 255, 255, 0.02) 50%,
+                    rgba(255, 255, 255, 0.08) 100%);
+            pointer-events: none;
+        }
+
+        .sidebar-header {
+            padding: 24px 20px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sidebar-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, #4f6ef7, #7c5cfc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(79, 110, 247, 0.4);
+        }
+
+        .sidebar-title {
+            color: #e8eaef;
+            font-size: 16px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            line-height: 1.3;
+        }
+        .sidebar-subtitle {
+            color: #7a7f90;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .sidebar-section-label {
+            color: #6b7084;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            padding: 20px 20px 8px;
+        }
+
+        .module-btn-list {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 4px 14px 10px;
+            overflow-y: auto;
+        }
+
+        .module-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 13px 16px;
+            border-radius: var(--radius-md);
+            cursor: grab;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            color: #d1d5db;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all var(--transition-fast);
+            position: relative;
+            overflow: hidden;
+            letter-spacing: 0.2px;
+        }
+
+        .module-btn::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            border-radius: 0 3px 3px 0;
+            transition: all var(--transition-smooth);
+        }
+
+        .module-btn:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: rgba(255, 255, 255, 0.12);
+            color: #f1f5f9;
+            transform: translateX(2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+        }
+        .module-btn:active {
+            cursor: grabbing;
+            transform: scale(0.97);
+            transition: all 0.08s ease;
+        }
+
+        .module-btn.mouse-btn::before { background: #4f6ef7; }
+        .module-btn.keyboard-btn::before { background: #8b5cf6; }
+        .module-btn.screenshot-btn::before { background: #06b6d4; }
+        .module-btn.compare-btn::before { background: #f59e0b; }
+        .module-btn.judge-btn::before { background: #ef4444; }
+        .module-btn.end-btn::before { background: #6b7280; }
+
+        .module-btn-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .mouse-btn .module-btn-icon { background: rgba(79, 110, 247, 0.2); }
+        .keyboard-btn .module-btn-icon { background: rgba(139, 92, 246, 0.2); }
+        .screenshot-btn .module-btn-icon { background: rgba(6, 182, 212, 0.2); }
+        .compare-btn .module-btn-icon { background: rgba(245, 158, 11, 0.2); }
+        .judge-btn .module-btn-icon { background: rgba(239, 68, 68, 0.2); }
+        .end-btn .module-btn-icon { background: rgba(107, 114, 128, 0.2); }
+
+        .sidebar-footer {
+            padding: 16px 14px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn-generate-json,
+        .btn-import-json {
+            width: 100%;
+            padding: 14px 20px;
+            border-radius: var(--radius-md);
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            letter-spacing: 0.4px;
+            transition: all var(--transition-smooth);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #fff;
+        }
+
+        .btn-generate-json {
+            background: linear-gradient(135deg, #4f6ef7, #6366f1);
+            box-shadow: 0 4px 18px rgba(79, 110, 247, 0.35);
+        }
+        .btn-generate-json:hover {
+            box-shadow: 0 6px 25px rgba(79, 110, 247, 0.5);
+            transform: translateY(-1px);
+        }
+
+        .btn-import-json {
+            background: linear-gradient(135deg, #22c55e, #16a34a);
+            box-shadow: 0 4px 18px rgba(34, 197, 94, 0.35);
+        }
+        .btn-import-json:hover {
+            box-shadow: 0 6px 25px rgba(34, 197, 94, 0.5);
+            transform: translateY(-1px);
+        }
+        .btn-generate-json:active,
+        .btn-import-json:active {
+            transform: scale(0.96);
+            transition: all 0.08s ease;
+        }
+
+        /* ============ 画布区域 ============ */
+        .canvas-wrapper {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+            background: #e8ecf1;
+        }
+
+        .canvas-scroll {
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            position: relative;
+            scroll-behavior: smooth;
+        }
+
+        .canvas-inner {
+            width: 5000px;
+            height: 4000px;
+            position: relative;
+            background-color: #f3f4f7;
+            background-image:
+                radial-gradient(circle, #d1d5db 1px, transparent 1px);
+            background-size: 24px 24px;
+            background-position: 0 0;
+            transform-origin: 0 0;
+        }
+
+        .canvas-inner::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 0px 0px, #c8cdd6 1px, transparent 1px),
+                radial-gradient(circle at 12px 12px, #c8cdd6 0.5px, transparent 0.5px);
+            background-size: 24px 24px, 24px 24px;
+            opacity: 0.5;
+            z-index: 0;
+        }
+
+        .connections-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5000px;
+            height: 4000px;
+            pointer-events: none;
+            z-index: 1;
+        }
+        .connections-svg path.connection-line {
+            pointer-events: stroke;
+            cursor: pointer;
+        }
+        .connections-svg .conn-delete-circle {
+            pointer-events: all;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .connections-svg .conn-delete-circle:hover {
+            fill: #ef4444;
+            r: 8;
+        }
+        .connections-svg .temp-line {
+            pointer-events: none;
+            stroke-dasharray: 8 5;
+            animation: dash-flow 0.6s linear infinite;
+        }
+        @keyframes dash-flow {
+            to { stroke-dashoffset: -26; }
+        }
+
+        .connections-svg defs marker#arrowhead path { fill: #5a6072; }
+        .connections-svg defs marker#arrowhead-if path { fill: #3b82f6; }
+        .connections-svg defs marker#arrowhead-else path { fill: #f59e0b; }
+        .connections-svg defs marker#arrowhead-temp path { fill: #8b5cf6; }
+
+        /* ============ 模块节点 ============ */
+        .module-node {
+            position: absolute;
+            background: var(--module-bg);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--module-shadow);
+            min-width: 200px;
+            max-width: 260px;
+            z-index: 2;
+            cursor: move;
+            transition: box-shadow var(--transition-smooth), z-index 0s;
+            border: 1.5px solid transparent;
+            font-family: var(--font-sans);
+        }
+        .module-node:hover {
+            box-shadow: var(--module-shadow-hover);
+            z-index: 5;
+        }
+        .module-node.dragging {
+            z-index: 20;
+            box-shadow: 0 16px 48px rgba(0,0,0,0.2), 0 4px 12px rgba(0,0,0,0.12);
+            border-color: #4f6ef7;
+            transition: box-shadow var(--transition-smooth), border-color var(--transition-fast);
+            opacity: 0.92;
+        }
+        .module-node.judge-type { border-left: 3px solid #ef4444; }
+        .module-node.mouse-type { border-left: 3px solid #4f6ef7; }
+        .module-node.keyboard-type { border-left: 3px solid #8b5cf6; }
+        .module-node.screenshot-type { border-left: 3px solid #06b6d4; }
+        .module-node.compare-type { border-left: 3px solid #f59e0b; }
+        .module-node.end-type { border-left: 3px solid #6b7280; }
+
+        .module-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px 10px;
+            position: relative;
+        }
+        .module-icon-wrap {
+            width: 34px;
+            height: 34px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .mouse-type .module-icon-wrap { background: #eef1ff; color: #4f6ef7; }
+        .keyboard-type .module-icon-wrap { background: #f3efff; color: #8b5cf6; }
+        .screenshot-type .module-icon-wrap { background: #ecfbff; color: #06b6d4; }
+        .compare-type .module-icon-wrap { background: #fffbeb; color: #f59e0b; }
+        .judge-type .module-icon-wrap { background: #fef2f2; color: #ef4444; }
+        .end-type .module-icon-wrap { background: #f3f4f6; color: #6b7280; }
+
+        .module-title-text {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: 0.2px;
+            flex: 1;
+            line-height: 1.3;
+        }
+        .module-delete-btn {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-size: 16px;
+            color: #9ca3af;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all var(--transition-fast);
+            flex-shrink: 0;
+            line-height: 1;
+            opacity: 0;
+            transform: scale(0.7);
+        }
+        .module-node:hover .module-delete-btn {
+            opacity: 1;
+            transform: scale(1);
+        }
+        .module-delete-btn:hover {
+            background: #fef2f2;
+            color: #ef4444;
+        }
+
+        .module-body {
+            padding: 6px 16px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .module-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .module-field label {
+            font-size: 10px;
+            font-weight: 600;
+            color: #8b90a0;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+        .module-field input {
+            width: 100%;
+            padding: 9px 12px;
+            border-radius: 8px;
+            border: 1.5px solid #e5e7eb;
+            font-size: 13px;
+            font-family: var(--font-sans);
+            color: var(--text-primary);
+            background: #f9fafb;
+            transition: all var(--transition-fast);
+            outline: none;
+            letter-spacing: 0.2px;
+        }
+        .module-field input:focus {
+            border-color: #4f6ef7;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(79,110,247,0.08);
+        }
+        .module-field input::placeholder { color: #c5c9d2; }
+        .field-row { display: flex; gap: 8px; }
+        .field-row .module-field { flex: 1; }
+        .percentage-suffix { position: relative; }
+        .percentage-suffix::after {
+            content: '%';
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #9ca3af;
+            font-weight: 600;
+            font-size: 14px;
+            pointer-events: none;
+        }
+        .percentage-suffix input { padding-right: 32px; }
+
+        /* 端口 */
+        .port {
+            position: absolute;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            z-index: 10;
+            cursor: crosshair;
+            transition: all var(--transition-fast);
+            border: 2.5px solid;
+            background: #fff;
+            box-shadow: 0 0 0 0px rgba(79,110,247,0);
+        }
+        .port:hover {
+            transform: scale(1.35);
+            box-shadow: 0 0 0 8px rgba(79,110,247,0.15);
+            z-index: 15;
+        }
+        .port:active { transform: scale(1.5); }
+        .port.port-connected { box-shadow: 0 0 0 4px rgba(34,197,94,0.2); }
+
+        .port-input { left: -7px; top: 50%; transform: translateY(-50%); border-color: var(--port-input); background: #fff; }
+        .port-input:hover { border-color: #3651e0; box-shadow: 0 0 0 8px rgba(79,110,247,0.2); }
+
+        .port-output { right: -7px; top: 50%; transform: translateY(-50%); border-color: var(--port-output); background: #fff; }
+        .port-output:hover { border-color: #16a34a; box-shadow: 0 0 0 8px rgba(34,197,94,0.2); }
+        .port-output.port-connected { background: #dcfce7; border-color: #16a34a; }
+
+        .port-if { right: -7px; top: 30%; transform: translateY(-50%); border-color: var(--port-if); background: #fff; }
+        .port-if:hover { border-color: #2563eb; box-shadow: 0 0 0 8px rgba(59,130,246,0.2); }
+        .port-if.port-connected { background: #dbeafe; border-color: #2563eb; }
+
+        .port-else { right: -7px; top: 70%; transform: translateY(-50%); border-color: var(--port-else); background: #fff; }
+        .port-else:hover { border-color: #d97706; box-shadow: 0 0 0 8px rgba(245,158,11,0.2); }
+        .port-else.port-connected { background: #fef3c7; border-color: #d97706; }
+
+        .port-label {
+            position: absolute;
+            font-size: 9px;
+            font-weight: 700;
+            pointer-events: none;
+            white-space: nowrap;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .port-label-if { right: 18px; top: 30%; transform: translateY(-50%); color: #2563eb; background: #dbeafe; padding: 2px 7px; border-radius: 4px; font-size: 9px; }
+        .port-label-else { right: 18px; top: 70%; transform: translateY(-50%); color: #d97706; background: #fef3c7; padding: 2px 7px; border-radius: 4px; font-size: 9px; }
+
+        .toast {
+            position: fixed;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-120px);
+            background: #1e2233;
+            color: #f1f5f9;
+            padding: 14px 24px;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 999;
+            pointer-events: none;
+            transition: transform var(--transition-smooth);
+            box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+            letter-spacing: 0.3px;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); }
+        .toast.success { background: #065f46; color: #d1fae5; }
+        .toast.info { background: #1e3a5f; color: #dbeafe; }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.2s ease;
+            backdrop-filter: blur(4px);
+        }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-dialog {
+            background: #fff;
+            border-radius: 16px;
+            width: 700px;
+            max-width: 90vw;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+            animation: slideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+        }
+        @keyframes slideUp { from { opacity:0; transform: translateY(40px) scale(0.95); } to { opacity:1; transform: translateY(0) scale(1); } }
+        .modal-header { padding: 20px 24px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; }
+        .modal-title { font-size: 18px; font-weight: 700; color: #1e2233; }
+        .modal-close { width: 34px; height: 34px; border-radius: 50%; border: none; background: #f3f4f6; cursor: pointer; font-size: 18px; color: #6b7280; display: flex; align-items: center; justify-content: center; }
+        .modal-close:hover { background: #e5e7eb; color: #1e2233; }
+        .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+        .modal-body pre { background: #1e2233; color: #e2e8f0; padding: 20px; border-radius: 12px; font-size: 13px; line-height: 1.7; overflow-x: auto; font-family: 'JetBrains Mono','Fira Code','SF Mono','Consolas',monospace; white-space: pre-wrap; word-break: break-all; }
+        .modal-footer { padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; justify-content: flex-end; gap: 10px; }
+        .btn-copy { padding: 10px 22px; border-radius: 24px; border: none; cursor: pointer; font-weight: 600; background: #4f6ef7; color: #fff; }
+        .btn-copy:hover { background: #3b54e0; }
+        .btn-close-modal { padding: 10px 22px; border-radius: 24px; border: 1.5px solid #d1d5db; cursor: pointer; background: #fff; color: #4b5563; }
+        .btn-close-modal:hover { background: #f9fafb; }
+    </style>
+</head>
+<body>
+<div class="app-container">
+    <!-- 左侧面板 -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-logo">⚡</div>
+            <div>
+                <div class="sidebar-title">RPA 流程编辑器</div>
+                <div class="sidebar-subtitle">Flow Designer</div>
+            </div>
+        </div>
+        <div class="sidebar-section-label">🔧 操作模块</div>
+        <div class="module-btn-list" id="moduleBtnList">
+            <div class="module-btn mouse-btn" draggable="true" data-type="mouse">
+                <span class="module-btn-icon">🖱️</span> 鼠标操作
+            </div>
+            <div class="module-btn keyboard-btn" draggable="true" data-type="keyboard">
+                <span class="module-btn-icon">⌨️</span> 键盘操作
+            </div>
+            <div class="module-btn screenshot-btn" draggable="true" data-type="screenshot">
+                <span class="module-btn-icon">📸</span> 屏幕截图
+            </div>
+            <div class="module-btn compare-btn" draggable="true" data-type="compare">
+                <span class="module-btn-icon">🔍</span> 比对
+            </div>
+            <div class="module-btn judge-btn" draggable="true" data-type="judge">
+                <span class="module-btn-icon">🔀</span> 判断
+            </div>
+            <div class="module-btn end-btn" draggable="true" data-type="end">
+                <span class="module-btn-icon">⏹️</span> 结束
+            </div>
+        </div>
+        <div class="sidebar-footer">
+            <button class="btn-generate-json" id="btnGenerateJson"><span>{ }</span> 生成 JSON</button>
+            <button class="btn-import-json" id="btnImportJson"><span>📂</span> 导入 JSON</button>
+            <input type="file" id="importFileInput" accept=".json" style="display:none;">
+        </div>
+    </aside>
+
+    <!-- 画布 -->
+    <div class="canvas-wrapper" id="canvasWrapper">
+        <div class="canvas-scroll" id="canvasScroll">
+            <div class="canvas-inner" id="canvasInner">
+                <svg class="connections-svg" id="connectionsSvg">
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 L 2.5 4 Z" fill="#5a6072"/></marker>
+                        <marker id="arrowhead-if" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 L 2.5 4 Z" fill="#3b82f6"/></marker>
+                        <marker id="arrowhead-else" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 L 2.5 4 Z" fill="#f59e0b"/></marker>
+                        <marker id="arrowhead-temp" markerWidth="10" markerHeight="8" refX="9" refY="4" orient="auto"><path d="M 0 0 L 10 4 L 0 8 L 2.5 4 Z" fill="#8b5cf6"/></marker>
+                    </defs>
+                    <g id="connectionsGroup"></g>
+                    <g id="tempLineGroup"></g>
+                </svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-overlay" id="modalOverlay" style="display:none;">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <span class="modal-title">📋 流程图 JSON</span>
+            <button class="modal-close" id="modalClose">✕</button>
+        </div>
+        <div class="modal-body"><pre id="jsonContent"></pre></div>
+        <div class="modal-footer">
+            <button class="btn-close-modal" id="btnCloseModal">关闭</button>
+            <button class="btn-copy" id="btnCopyJson">📋 复制到剪贴板</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        const canvasInner = document.getElementById('canvasInner');
+        const canvasScroll = document.getElementById('canvasScroll');
+        const connectionsGroup = document.getElementById('connectionsGroup');
+        const tempLineGroup = document.getElementById('tempLineGroup');
+        const btnGenerateJson = document.getElementById('btnGenerateJson');
+        const btnImportJson = document.getElementById('btnImportJson');
+        const importFileInput = document.getElementById('importFileInput');
+        const toast = document.getElementById('toast');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const jsonContent = document.getElementById('jsonContent');
+        const modalClose = document.getElementById('modalClose');
+        const btnCloseModal = document.getElementById('btnCloseModal');
+        const btnCopyJson = document.getElementById('btnCopyJson');
+
+        let moduleIdCounter = 0;
+        let modules = [];
+        let connections = [];
+        let connectionIdCounter = 0;
+
+        let isConnecting = false;
+        let connectFromModuleId = null;
+        let connectFromPort = null;
+        let tempLineEnd = { x:0, y:0 };
+
+        let isDraggingModule = false;
+        let dragModuleId = null;
+        let dragOffsetX = 0, dragOffsetY = 0;
+
+        let toastTimer = null;
+
+        function generateId() { moduleIdCounter++; return 'module_' + moduleIdCounter; }
+        function generateConnId() { connectionIdCounter++; return 'conn_' + connectionIdCounter; }
+
+        function showToast(message, type='info') {
+            if(toastTimer) clearTimeout(toastTimer);
+            toast.textContent = message;
+            toast.className = 'toast '+type+' show';
+            toastTimer = setTimeout(()=> toast.classList.remove('show'), 2000);
+        }
+
+        function getModuleById(id) { return modules.find(m=>m.id===id); }
+
+        function getPortPosition(moduleId, portType) {
+            const el = document.querySelector(`.module-node[data-id="${moduleId}"]`);
+            if(!el) return null;
+            const portEl = el.querySelector(`.port[data-port="${portType}"]`);
+            if(!portEl) return null;
+            const portRect = portEl.getBoundingClientRect();
+            const canvasRect = canvasInner.getBoundingClientRect();
+            return {
+                x: portRect.left - canvasRect.left + portRect.width/2 + canvasScroll.scrollLeft,
+                y: portRect.top - canvasRect.top + portRect.height/2 + canvasScroll.scrollTop,
+            };
+        }
+
+        function getInputPortPosition(id) { return getPortPosition(id,'input'); }
+        function getOutputPortPosition(id, port='output') { return getPortPosition(id, port); }
+
+        function calcBezierPath(x1,y1,x2,y2) {
+            const dx = Math.abs(x2-x1), dy = Math.abs(y2-y1);
+            const offset = Math.max(60, Math.min(dx*0.5, dy*0.5, 180));
+            return `M ${x1} ${y1} C ${x1+offset} ${y1}, ${x2-offset} ${y2}, ${x2} ${y2}`;
+        }
+        function calcBezierMidpoint(x1,y1,x2,y2) {
+            const dx = Math.abs(x2-x1), dy = Math.abs(y2-y1);
+            const offset = Math.max(60, Math.min(dx*0.5, dy*0.5, 180));
+            const cx1=x1+offset, cy1=y1, cx2=x2-offset, cy2=y2;
+            const t=0.5, mt=1-t;
+            const mx = mt*mt*mt*x1 + 3*mt*mt*t*cx1 + 3*mt*t*t*cx2 + t*t*t*x2;
+            const my = mt*mt*mt*y1 + 3*mt*mt*t*cy1 + 3*mt*t*t*cy2 + t*t*t*y2;
+            return {x:mx, y:my};
+        }
+
+        function getConnectionMarker(conn) {
+            if(conn.fromPort==='if') return 'url(#arrowhead-if)';
+            if(conn.fromPort==='else') return 'url(#arrowhead-else)';
+            return 'url(#arrowhead)';
+        }
+        function getConnectionColor(conn) {
+            if(conn.fromPort==='if') return '#3b82f6';
+            if(conn.fromPort==='else') return '#f59e0b';
+            return '#5a6072';
+        }
+
+        function renderConnection(conn) {
+            let fromPos = (conn.fromPort==='if'||conn.fromPort==='else') ? getOutputPortPosition(conn.fromModuleId, conn.fromPort) : getOutputPortPosition(conn.fromModuleId,'output');
+            const toPos = getInputPortPosition(conn.toModuleId);
+            if(!fromPos||!toPos) return null;
+            const pathD = calcBezierPath(fromPos.x, fromPos.y, toPos.x, toPos.y);
+            const midpoint = calcBezierMidpoint(fromPos.x, fromPos.y, toPos.x, toPos.y);
+            return { pathD, midpoint, color: getConnectionColor(conn), marker: getConnectionMarker(conn), fromPos, toPos };
+        }
+
+        function refreshAllConnections() {
+            connectionsGroup.innerHTML = '';
+            connections.forEach(conn=>{
+                const r = renderConnection(conn);
+                if(!r) return;
+                const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+                g.setAttribute('data-conn-id', conn.id);
+                const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+                path.setAttribute('d', r.pathD);
+                path.setAttribute('fill','none');
+                path.setAttribute('stroke', r.color);
+                path.setAttribute('stroke-width','2.5');
+                path.setAttribute('stroke-linecap','round');
+                path.setAttribute('marker-end', r.marker);
+                path.classList.add('connection-line');
+                path.addEventListener('click',(e)=>{ e.stopPropagation(); deleteConnection(conn.id); });
+                g.appendChild(path);
+
+                const delCircle = document.createElementNS('http://www.w3.org/2000/svg','circle');
+                delCircle.setAttribute('cx', r.midpoint.x);
+                delCircle.setAttribute('cy', r.midpoint.y);
+                delCircle.setAttribute('r','6');
+                delCircle.setAttribute('fill','#fff');
+                delCircle.setAttribute('stroke', r.color);
+                delCircle.setAttribute('stroke-width','2');
+                delCircle.classList.add('conn-delete-circle');
+                delCircle.style.opacity='0';
+                delCircle.addEventListener('click',(e)=>{ e.stopPropagation(); deleteConnection(conn.id); });
+                g.addEventListener('mouseenter',()=>{ delCircle.style.opacity='1'; delCircle.setAttribute('r','7'); });
+                g.addEventListener('mouseleave',()=>{ delCircle.style.opacity='0'; delCircle.setAttribute('r','6'); });
+                g.appendChild(delCircle);
+                connectionsGroup.appendChild(g);
+            });
+        }
+
+        function refreshModuleConnections() { refreshAllConnections(); }
+
+        function createConnection(fromId, fromPort, toId) {
+            if(fromId===toId) { showToast('⚠️ 不能连接到自身'); return false; }
+            const existing = connections.find(c=>c.fromModuleId===fromId && c.fromPort===fromPort);
+            if(existing) connections = connections.filter(c=>c.id!==existing.id);
+            if(connections.find(c=>c.fromModuleId===fromId && c.fromPort===fromPort && c.toModuleId===toId)) {
+                showToast('⚠️ 连接已存在'); return false;
+            }
+            connections.push({ id: generateConnId(), fromModuleId: fromId, fromPort, toModuleId: toId });
+            refreshAllConnections();
+            updatePortConnectedStates();
+            showToast('✅ 连线已创建', 'success');
+            return true;
+        }
+
+        function deleteConnection(connId) {
+            connections = connections.filter(c=>c.id!==connId);
+            refreshAllConnections();
+            updatePortConnectedStates();
+        }
+
+        function deleteModuleConnections(moduleId) {
+            connections = connections.filter(c=>c.fromModuleId!==moduleId && c.toModuleId!==moduleId);
+            refreshAllConnections();
+            updatePortConnectedStates();
+        }
+
+        function updatePortConnectedStates() {
+            document.querySelectorAll('.port').forEach(p=>p.classList.remove('port-connected'));
+            connections.forEach(conn=>{
+                const el = document.querySelector(`.module-node[data-id="${conn.fromModuleId}"]`);
+                if(!el) return;
+                const port = (conn.fromPort==='if'||conn.fromPort==='else') ? conn.fromPort : 'output';
+                const portEl = el.querySelector(`.port[data-port="${port}"]`);
+                if(portEl) portEl.classList.add('port-connected');
+            });
+        }
+
+        function getModuleTitle(type) {
+            const map = { mouse:'鼠标操作', keyboard:'键盘操作', screenshot:'屏幕截图', compare:'比对', judge:'判断', end:'结束' };
+            return map[type]||'未知';
+        }
+        function getModuleIcon(type) {
+            const map = { mouse:'🖱️', keyboard:'⌨️', screenshot:'📸', compare:'🔍', judge:'🔀', end:'⏹️' };
+            return map[type]||'📦';
+        }
+        function getModuleTypeClass(type) {
+            const map = { mouse:'mouse-type', keyboard:'keyboard-type', screenshot:'screenshot-type', compare:'compare-type', judge:'judge-type', end:'end-type' };
+            return map[type]||'';
+        }
+
+        function createModuleElement(moduleObj) {
+            const el = document.createElement('div');
+            el.className = `module-node ${getModuleTypeClass(moduleObj.type)}`;
+            el.setAttribute('data-id', moduleObj.id);
+            el.setAttribute('data-type', moduleObj.type);
+            el.style.left = moduleObj.x+'px';
+            el.style.top = moduleObj.y+'px';
+
+            let bodyHTML = '';
+            const d = moduleObj.data || {};
+            switch(moduleObj.type) {
+                case 'mouse':
+                    bodyHTML = `<div class="module-body"><div class="field-row">
+                        <div class="module-field"><label>屏幕 X 坐标</label><input type="text" placeholder="X坐标" data-field="xCoord" value="${d.xCoord||''}"></div>
+                        <div class="module-field"><label>屏幕 Y 坐标</label><input type="text" placeholder="Y坐标" data-field="yCoord" value="${d.yCoord||''}"></div>
+                    </div></div>`; break;
+                case 'keyboard':
+                    bodyHTML = `<div class="module-body"><div class="module-field"><label>录入信息</label><input type="text" placeholder="输入内容" data-field="inputInfo" value="${d.inputInfo||''}"></div></div>`; break;
+                case 'screenshot':
+                    bodyHTML = `<div class="module-body"><div class="module-field"><label style="color:#9ca3af;">自动截取屏幕</label></div></div>`; break;
+                case 'compare':
+                    bodyHTML = `<div class="module-body"><div class="module-field"><label>对比内容</label><input type="text" placeholder="输入对比内容" data-field="compareContent" value="${d.compareContent||''}"></div></div>`; break;
+                case 'judge':
+                    bodyHTML = `<div class="module-body"><div class="module-field percentage-suffix"><label>判断百分比阈值</label><input type="text" placeholder="百分比" data-field="percentage" value="${d.percentage||''}"></div></div>`; break;
+                case 'end':
+                    bodyHTML = `<div class="module-body"><div class="module-field"><label style="color:#9ca3af;">流程结束</label></div></div>`; break;
+            }
+
+            el.innerHTML = `
+                <div class="module-header">
+                    <div class="module-icon-wrap">${getModuleIcon(moduleObj.type)}</div>
+                    <span class="module-title-text">${getModuleTitle(moduleObj.type)}</span>
+                    <button class="module-delete-btn">✕</button>
+                </div>
+                ${bodyHTML}
+                <div class="port port-input" data-port="input"></div>
+                ${moduleObj.type==='judge' ? `
+                    <span class="port-label port-label-if">IF</span><div class="port port-if" data-port="if"></div>
+                    <span class="port-label port-label-else">ELSE</span><div class="port port-else" data-port="else"></div>
+                ` : (moduleObj.type==='end' ? '' : `<div class="port port-output" data-port="output"></div>`)}
+            `;
+
+            el.querySelector('.module-delete-btn').addEventListener('click', (e)=>{ e.stopPropagation(); deleteModule(moduleObj.id); });
+            el.querySelectorAll('input[data-field]').forEach(inp=>{
+                inp.addEventListener('input', ()=>{ moduleObj.data[inp.dataset.field] = inp.value; });
+                inp.addEventListener('mousedown', e=>e.stopPropagation());
+            });
+
+            el.addEventListener('mousedown', (e)=>{
+                if(e.target.closest('.port')||e.target.closest('input')||e.target.closest('.module-delete-btn')) return;
+                e.preventDefault();
+                startDragModule(moduleObj.id, e.clientX, e.clientY);
+            });
+
+            el.querySelectorAll('.port-output, .port-if, .port-else').forEach(port=>{
+                port.addEventListener('mousedown', (e)=>{
+                    e.stopPropagation(); e.preventDefault();
+                    startConnecting(moduleObj.id, port.dataset.port, e.clientX, e.clientY);
+                });
+            });
+            el.querySelector('.port-input')?.addEventListener('mousedown', e=>{ e.stopPropagation(); e.preventDefault(); });
+
+            return el;
+        }
+
+        function addModule(type, x, y, id=null, data={}) {
+            const moduleId = id || generateId();
+            const moduleObj = { id: moduleId, type, x, y, data: { ...data } };
+            modules.push(moduleObj);
+            const el = createModuleElement(moduleObj);
+            canvasInner.appendChild(el);
+            el.style.opacity='0'; el.style.transform='scale(0.85)';
+            requestAnimationFrame(()=>{
+                el.style.transition='opacity 0.25s ease, transform 0.25s cubic-bezier(0.34,1.56,0.64,1)';
+                el.style.opacity='1'; el.style.transform='scale(1)';
+            });
+            updatePortConnectedStates();
+            return moduleObj;
+        }
+
+        function deleteModule(moduleId) {
+            const el = document.querySelector(`.module-node[data-id="${moduleId}"]`);
+            if(el) {
+                el.style.transition='opacity 0.2s ease, transform 0.2s ease';
+                el.style.opacity='0'; el.style.transform='scale(0.8)';
+                setTimeout(()=>el.remove(), 200);
+            }
+            modules = modules.filter(m=>m.id!==moduleId);
+            deleteModuleConnections(moduleId);
+            updatePortConnectedStates();
+            showToast('🗑️ 模块已删除');
+        }
+
+        function startDragModule(id, cx, cy) {
+            const m = getModuleById(id); if(!m) return;
+            isDraggingModule = true; dragModuleId = id;
+            dragOffsetX = cx - m.x; dragOffsetY = cy - m.y;
+            document.querySelector(`.module-node[data-id="${id}"]`)?.classList.add('dragging');
+        }
+        function moveDragModule(cx, cy) {
+            if(!isDraggingModule) return;
+            const m = getModuleById(dragModuleId); if(!m) return;
+            const el = document.querySelector(`.module-node[data-id="${dragModuleId}"]`);
+            m.x = Math.max(0, cx - dragOffsetX);
+            m.y = Math.max(0, cy - dragOffsetY);
+            if(el) { el.style.left = m.x+'px'; el.style.top = m.y+'px'; }
+            refreshAllConnections();
+        }
+        function endDragModule() {
+            if(!isDraggingModule) return;
+            document.querySelector(`.module-node[data-id="${dragModuleId}"]`)?.classList.remove('dragging');
+            isDraggingModule = false; dragModuleId = null;
+            refreshAllConnections();
+            updatePortConnectedStates();
+        }
+
+        function startConnecting(fromId, port, cx, cy) {
+            isConnecting = true; connectFromModuleId = fromId; connectFromPort = port;
+            const pos = getOutputPortPosition(fromId, port);
+            if(pos) tempLineEnd = {x:pos.x, y:pos.y};
+            updateTempLine(cx, cy);
+            document.body.style.cursor = 'crosshair';
+        }
+        function updateTempLine(cx, cy) {
+            if(!isConnecting) return;
+            const rect = canvasInner.getBoundingClientRect();
+            tempLineEnd = { x: cx - rect.left + canvasScroll.scrollLeft, y: cy - rect.top + canvasScroll.scrollTop };
+            renderTempLine();
+        }
+        function renderTempLine() {
+            tempLineGroup.innerHTML = '';
+            if(!isConnecting) return;
+            const from = getOutputPortPosition(connectFromModuleId, connectFromPort);
+            if(!from) return;
+            const d = calcBezierPath(from.x, from.y, tempLineEnd.x, tempLineEnd.y);
+            const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+            path.setAttribute('d', d); path.setAttribute('fill','none'); path.setAttribute('stroke','#8b5cf6');
+            path.setAttribute('stroke-width','2.5'); path.setAttribute('stroke-dasharray','10 6');
+            path.setAttribute('marker-end','url(#arrowhead-temp)'); path.classList.add('temp-line');
+            tempLineGroup.appendChild(path);
+        }
+        function cancelConnecting() {
+            isConnecting = false; connectFromModuleId = null; connectFromPort = null;
+            tempLineGroup.innerHTML = ''; document.body.style.cursor = '';
+        }
+        function tryCompleteConnection(cx, cy) {
+            if(!isConnecting) return;
+            const portEl = findInputPortAt(cx, cy);
+            if(portEl) {
+                const targetEl = portEl.closest('.module-node');
+                if(targetEl) {
+                    const toId = targetEl.dataset.id;
+                    if(toId && toId !== connectFromModuleId) createConnection(connectFromModuleId, connectFromPort, toId);
+                }
+            }
+            cancelConnecting();
+        }
+        function findInputPortAt(cx, cy) {
+            const ports = document.querySelectorAll('.port-input');
+            for(const p of ports) {
+                const r = p.getBoundingClientRect();
+                const dist = Math.hypot(cx - (r.left+r.width/2), cy - (r.top+r.height/2));
+                if(dist <= 20) return p;
+            }
+            return null;
+        }
+
+        document.addEventListener('mousemove', (e)=>{
+            if(isDraggingModule) moveDragModule(e.clientX, e.clientY);
+            if(isConnecting) updateTempLine(e.clientX, e.clientY);
+        });
+        document.addEventListener('mouseup', (e)=>{
+            if(isDraggingModule) endDragModule();
+            if(isConnecting) tryCompleteConnection(e.clientX, e.clientY);
+        });
+        document.addEventListener('keydown', (e)=>{
+            if(e.key==='Escape' && isConnecting) { cancelConnecting(); showToast('❌ 连线已取消'); }
+        });
+
+        // 拖入模块
+        document.querySelectorAll('.module-btn[draggable]').forEach(btn=>{
+            btn.addEventListener('dragstart', e=>{ e.dataTransfer.setData('text/plain', btn.dataset.type); e.dataTransfer.effectAllowed='copy'; });
+        });
+        canvasWrapper.addEventListener('dragover', e=>{ e.preventDefault(); e.dataTransfer.dropEffect='copy'; });
+        canvasWrapper.addEventListener('drop', e=>{
+            e.preventDefault();
+            const type = e.dataTransfer.getData('text/plain');
+            if(!type) return;
+            const rect = canvasInner.getBoundingClientRect();
+            const x = e.clientX - rect.left + canvasScroll.scrollLeft - 100;
+            const y = e.clientY - rect.top + canvasScroll.scrollTop - 40;
+            addModule(type, Math.max(20,x), Math.max(20,y));
+            showToast(`✅ 已添加${getModuleTitle(type)}`);
+        });
+
+        // 生成JSON
+        function generateFlowchartJSON() {
+            return JSON.stringify({
+                version:'1.0',
+                generatedAt: new Date().toISOString(),
+                flowchart: {
+                    modules: modules.map(m=>{
+                        const obj = { id:m.id, type:m.type, title:getModuleTitle(m.type), position:{x:Math.round(m.x),y:Math.round(m.y)} };
+                        const d = m.data;
+                        if(m.type==='mouse') { obj.screenX = d.xCoord||''; obj.screenY = d.yCoord||''; }
+                        else if(m.type==='keyboard') obj.inputContent = d.inputInfo||'';
+                        else if(m.type==='compare') obj.compareContent = d.compareContent||'';
+                        else if(m.type==='judge') { obj.thresholdPercentage = d.percentage||''; obj.outputs = ['if','else']; }
+                        return obj;
+                    }),
+                    connections: connections.map(c=>({ id:c.id, from:c.fromModuleId, fromPort:c.fromPort, to:c.toModuleId }))
+                }
+            }, null, 2);
+        }
+
+        btnGenerateJson.addEventListener('click', ()=>{
+            if(modules.length===0) { showToast('⚠️ 画布为空，请先添加模块'); return; }
+            jsonContent.textContent = generateFlowchartJSON();
+            modalOverlay.style.display = 'flex';
+        });
+        modalClose.addEventListener('click', ()=> modalOverlay.style.display='none');
+        btnCloseModal.addEventListener('click', ()=> modalOverlay.style.display='none');
+        modalOverlay.addEventListener('click', e=>{ if(e.target===modalOverlay) modalOverlay.style.display='none'; });
+        btnCopyJson.addEventListener('click', ()=>{
+            navigator.clipboard.writeText(jsonContent.textContent).then(()=>showToast('📋 已复制','success')).catch(()=>showToast('复制失败'));
+        });
+
+        // 导入JSON
+        btnImportJson.addEventListener('click', ()=> importFileInput.click());
+        importFileInput.addEventListener('change', ()=>{
+            const file = importFileInput.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e)=>{
+                try {
+                    const json = JSON.parse(e.target.result);
+                    importFromJSON(json);
+                    showToast('✅ 导入成功','success');
+                } catch(err) {
+                    showToast('❌ JSON解析失败：'+err.message);
+                }
+                importFileInput.value = '';
+            };
+            reader.readAsText(file);
+        });
+
+        function importFromJSON(json) {
+            // 清空现有画布
+            document.querySelectorAll('.module-node').forEach(el=>el.remove());
+            modules = [];
+            connections = [];
+            connectionsGroup.innerHTML = '';
+            tempLineGroup.innerHTML = '';
+
+            const f = json.flowchart;
+            if(!f || !Array.isArray(f.modules)) throw new Error('无效的流程图数据');
+
+            // 重建模块
+            f.modules.forEach(m=>{
+                const data = {};
+                if(m.type==='mouse') { data.xCoord = m.screenX||''; data.yCoord = m.screenY||''; }
+                else if(m.type==='keyboard') data.inputInfo = m.inputContent||'';
+                else if(m.type==='compare') data.compareContent = m.compareContent||'';
+                else if(m.type==='judge') data.percentage = m.thresholdPercentage||'';
+                addModule(m.type, m.position?.x||100, m.position?.y||100, m.id, data);
+            });
+
+            // 重建连线
+            if(Array.isArray(f.connections)) {
+                f.connections.forEach(c=>{
+                    connections.push({ id: c.id || generateConnId(), fromModuleId: c.from, fromPort: c.fromPort, toModuleId: c.to });
+                });
+            }
+
+            // 更新计数器
+            const maxModNum = modules.reduce((max, m)=>{ const n=parseInt(m.id.split('_')[1]); return isNaN(n)?max:Math.max(max,n); },0);
+            moduleIdCounter = Math.max(moduleIdCounter, maxModNum);
+            const maxConnNum = connections.reduce((max, c)=>{ const n=parseInt(c.id.split('_')[1]); return isNaN(n)?max:Math.max(max,n); },0);
+            connectionIdCounter = Math.max(connectionIdCounter, maxConnNum);
+
+            refreshAllConnections();
+            updatePortConnectedStates();
+        }
+
+        // 初始化空白画布
+        updatePortConnectedStates();
+    })();
+</script>
+</body>
+</html>
